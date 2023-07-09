@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Driver Template to Start and Stop RDS"
+
+Parameters:
+  project:
+    Type: String
+    Default: devops-poc
+    Description: Project name
+  app:
+    Type: String
+    Default: app
+    Description:  Application name
+  env:
+    Type: String
+    Default: dev
+    AllowedValues: [prod, dev, qa]
+    Description:  Environment name
+  dBUsername:
+    Type: String
+    NoEcho: true
+    Description: The Username for database access
+  dBPassword:
+    Type: String
+    NoEcho: true
+    Description: The Password for database access
+  s3ArtifactPath:
+    Type: String
+    Default: "https://iacartifacts-devops-youtube-tutorials-us-east-1-355986150263.s3.amazonaws.com/code/cfn/services"
+    Description: "Artifact Bucket path"
+
+Resources:
+  rdsInstance:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${s3ArtifactPath}/rdsStartStop/rds-app.yml"
+      Parameters:
+        project: !Ref project
+        app: !Ref app
+        env: !Ref env
+        dBInstanceIdentifier: db
+        dbName: demomysqldb
+        dBInstanceClass: db.t3.micro
+        dbProtectedSubnet01: subnet-05ea9580553f9c102
+        dbProtectedSubnet02: subnet-03d4d80ccb284cd35
+        dbSecurityGroup: sg-0deba5a73d910e1a5
+        dbEncryptionStatus: true
+        dbPubliclyAccessible: false
+        dbStorageType: gp2
+        dbDeletionProtection: false
+        dBAllocatedStorage: 20
+        dBEngine: MySQL
+        dBUsername: !Ref dBUsername
+        dBPassword: !Ref dBPassword
+  rdsLambdaFunction:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${s3ArtifactPath}/rdsStartStop/rdsLambdaFunction.yml"
+      Parameters:
+        project: !Ref project
+        app: !Ref app
+        env: !Ref env
+        lambdaExecutionRoleArn: !GetAtt lambdaExecutionRole.Outputs.lambdaExecutionRoleArn
+        s3Bucket: devops-poc-artifacts-us-east-1-355986150263
+        s3Key: rdsStartStop.zip
+        runtimeVersion: python3.7
+        lambdaHandler: startstoprds.lambda_handler
+        timeout: 30
+  cloudWatchEventRules:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${s3ArtifactPath}/rdsStartStop/cloudWatchEventRules.yml"
+      Parameters:
+        project: !Ref project
+        app: !Ref app
+        env: !Ref env
+        startScheduleExpression: cron(0 6 ? * MON-FRI *)
+        stopScheduleExpression: cron(0 15 ? * MON-FRI *)
+        lambdaFunctionArn: !GetAtt rdsLambdaFunction.Outputs.lambdaFunctionArn
+        startAction: start
+        stopAction: stop
+        ruleState: ENABLED
+        lambdaFunctionArn: !GetAtt rdsLambdaFunction.Outputs.lambdaFunctionArn
+  lambdaExecutionRole:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${s3ArtifactPath}/rdsStartStop/rdsLambdaExecutionRole.yml"
+      Parameters:
+        project: !Ref project
+        app: !Ref app
+        env: !Ref env
+
+Outputs:
+  rdsInstance:
+    Value: !Ref rdsInstance
+    Export:
+      Name: !Sub '${project}-${app}-${env}-rdsInstance'
+  rdsLambdaFunction:
+    Value: !Ref rdsLambdaFunction
+    Export:
+      Name: !Sub '${project}-${app}-${env}-rdsLambdaFunctionStack' 
+  cloudWatchEventRules:
+    Value: !Ref cloudWatchEventRules
+    Export:
+      Name: !Sub '${project}-${app}-${env}-cloudWatchEventRulesStack'  
+  lambdaExecutionRole:
+    Value: !Ref lambdaExecutionRole
+    Export:
+      Name: !Sub '${project}-${app}-${env}-lambdaExecutionRoleStack'

@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "CloudFormation Template to deploy lambda function"
+
+Parameters:
+  project:
+    Type: String
+    Default: devops-poc
+    Description: Project name
+  app:
+    Type: String
+    Default: app
+    Description:  Application name
+  env:
+    Type: String
+    Default: dev
+    AllowedValues: [prod, dev, qa]
+    Description: Environment name
+  lambdaExecutionRoleArn:
+    Type: String
+    Description: ARN of lambda execution role
+  s3Bucket:
+    Type: String
+    Description: An amazon S3 bucket in the same AWS region as your function
+  s3Key:
+    Type: String
+    Description: The amazon S3 key of the deployment package
+  runtimeVersion:
+    Type: String
+    Description: The identifier of the function's runtime
+  lambdaHandler:
+    Type: String
+    Description: The name of the method within your code that Lambda calls to run your function
+  timeout:
+    Type: String
+    Description: The amount of time (in seconds) that Lambda allows a function to run before stopping it
+
+Resources:
+  lambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: !Ref runtimeVersion
+      Handler: !Ref lambdaHandler
+      Timeout: !Ref timeout
+      Role: !Ref lambdaExecutionRoleArn
+      Code:
+        S3Bucket: !Ref s3Bucket
+        S3Key: !Ref s3Key
+      Tags:
+          - Key: Name
+            Value: !Sub ${project}-${app}-${env}-lambdaFunction
+          - Key: project
+            Value: !Ref project
+          - Key: app
+            Value: !Ref app
+          - Key: environment
+            Value: !Ref env
+
+Outputs:
+  lambdaFunctionId:
+    Value: !Ref lambdaFunction
+    Export:
+      Name: !Sub '${project}-${app}-${env}-lambdaFunctionId'
+  lambdaFunctionArn:
+    Value: !GetAtt lambdaFunction.Arn
+    Export:
+      Name: !Sub '${project}-${app}-${env}-lambdaFunctionArn'

@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: 'Template to deploy IAM roles'
+Parameters:
+  project:
+    Type: String
+    Default: devops-poc
+    Description:  Project Name
+  app:
+    Type: String
+    Default: app
+    Description:  Application name
+  env:
+    Type: String
+    Default: dev
+    AllowedValues: [prod, dev, qa]
+    Description:  Environment Name
+
+Resources:
+  lambdaExecutionRole: 
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: LambdaExecutionRoleforRDS
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          -
+            Effect: "Allow"
+            Principal: 
+              Service:
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Tags:
+          - Key: Name
+            Value: !Sub "${project}-${app}-${env}-lambdaExecutionRole-${AWS::Region}"
+          - Key: project
+            Value: !Ref project
+          - Key: environment
+            Value: !Ref env
+
+  lambdaPolicyToAccessRDS:
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "RDSAccessPolicy"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Action:
+              - rds:DescribeDBInstances
+              - rds:StopDBInstance
+              - rds:StartDBInstance
+            Resource:
+              - !Sub arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:*           
+      Roles:
+      - !Ref lambdaExecutionRole
+
+Outputs:
+  lambdaExecutionRoleArn:
+    Value: !GetAtt lambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${project}-${app}-${env}-lambdaExecutionRoleArn'

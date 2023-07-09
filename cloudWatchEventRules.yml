@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "CloudFormation template to deploy cloudwatch events rule"
+
+Parameters:
+  project:
+    Type: String
+    Default: devops-poc
+    Description: Project name
+  app:
+    Type: String
+    Default: app
+    Description:  Application name
+  env:
+    Type: String
+    Default: dev
+    AllowedValues: [prod, dev, qa]
+    Description: Environment name
+  startScheduleExpression:
+    Type: String
+    Description: The start scheduling expression of RDS
+  stopScheduleExpression:
+    Type: String
+    Description: The stop scheduling expression of RDS
+  lambdaFunctionArn:
+    Type: String
+    Description: ARN of lambda function
+  startAction:
+    Type: String
+    Default: start
+    Description: Start action of DB instance
+  stopAction:
+    Type: String
+    Default: stop
+    Description: Stop action of DB instance
+  ruleState:
+    Type: String
+    AllowedValues: [ENABLED, DISABLED]
+    Description: The state of the rule
+  lambdaFunctionArn:
+    Type: String
+    Description: ARN of lambda function
+
+Resources:
+  cloudWatchStartEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: CloudWatch event rule to start RDS
+      ScheduleExpression: !Ref startScheduleExpression
+      State: !Ref ruleState
+      Targets:
+        - Arn: !Ref lambdaFunctionArn
+          Input: !Sub '{"action": "${startAction}"}'
+          Id: 'startRdsRule'  
+  cloudWatchStopEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: CloudWatch event rule to stop RDS
+      ScheduleExpression: !Ref stopScheduleExpression
+      State: !Ref ruleState
+      Targets:  
+        - Arn: !Ref lambdaFunctionArn
+          Input: !Sub '{"action": "${stopAction}"}'
+          Id: 'stopRdsRule'
+  
+  eventruleLambdaPermissionforstart:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref lambdaFunctionArn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt cloudWatchStartEventRule.Arn
+  eventruleLambdaPermissionforstop:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref lambdaFunctionArn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt cloudWatchStopEventRule.Arn
+
+Outputs:
+  cloudWatchStartEventRuleArn:
+    Value: !GetAtt cloudWatchStartEventRule.Arn
+    Export:
+      Name: !Sub '${project}-${env}-cloudWatchStartEventRuleArn' 
+  cloudWatchStopEventRuleArn:
+    Value: !GetAtt cloudWatchStopEventRule.Arn
+    Export:
+      Name: !Sub '${project}-${env}-cloudWatchStopEventRuleArn'
